@@ -1,0 +1,142 @@
+<template>
+  <div class="p-5">
+    <h1>ProseMirror be here!</h1>
+    <div ref="editor" class="min-h-[200px] max-w-[600px] border border-stone-400"></div>
+  </div>
+</template>
+
+<script setup>
+import { onMounted, ref, onBeforeUnmount } from 'vue'
+import { EditorState, Plugin } from 'prosemirror-state'
+import { EditorView } from 'prosemirror-view'
+import { DOMParser } from 'prosemirror-model'
+import { schema } from 'prosemirror-schema-basic'
+import { buildKeymap } from 'prosemirror-example-setup'
+import { baseKeymap, toggleMark } from 'prosemirror-commands'
+import { history } from 'prosemirror-history'
+import '../assets/editor.scss'
+import { keymap } from 'prosemirror-keymap'
+import { menuBar } from 'prosemirror-menu'
+import { buildMenuItems } from 'prosemirror-example-setup'
+
+const editor = ref(null)
+let view
+
+const createEditor = () => {
+  const initialContent = `<p>Hello, Insert text here!</p>`
+  const contentElement = document.createElement('div') //tao content div
+  contentElement.innerHTML = initialContent //bind init content
+  const doc = DOMParser.fromSchema(schema).parse(contentElement)
+
+  function findTextPosition(doc, pos) {
+    const isCharacter = (char) => /\S/.test(char) // character is not " " will be in a word
+
+    let start = pos,
+      end = pos
+    while (start > 0 && isCharacter(doc.textBetween(start - 1, start))) {
+      start--
+    }
+    while (end < doc.nodeSize && isCharacter(doc.textBetween(end, end + 1))) {
+      end++
+    }
+
+    return { start, end }
+  }
+
+  const handleLinkTransformation = (view, from, to, text) => {
+    const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/g
+    const tr = view.state.tr
+    let pos = from
+
+    text.split(urlPattern).forEach((part) => {
+      if (urlPattern.test(part)) {
+        const url = part.startsWith('http') ? part : `http://${part}`
+        tr.replaceWith(
+          pos,
+          pos + part.length,
+          schema.text(part, [schema.marks.link.create({ href: url })])
+        )
+        pos += part.length
+      } else {
+        tr.replaceWith(pos, pos + part.length, schema.text(part))
+        pos += part.length
+      }
+    })
+
+    view.dispatch(tr)
+    return true
+  }
+  const handlePaste = new Plugin({
+    props: {
+      handlePaste(view, event) {
+        const text = event.clipboardData.getData('text/plain')
+        const { from, to } = view.state.selection
+        return handleLinkTransformation(view, from, to, text)
+      }
+    }
+  })
+  const state = EditorState.create({
+    doc,
+    plugins: [
+      history(),
+      keymap({
+        'Mod-b': (state, dispatch) => {
+          const { $cursor } = state.selection
+          // selection được chọn. $cursor là nơi được chọn(vị trí trỏ chuột)
+          const markType = state.schema.marks.strong // markType của schema mặc định text strong
+          if (!$cursor) {
+            // If text is selected, use the default toggleMark command
+            //toggleMark nhận vào một markType và trả về 1 hàm (state, dispatch, view?)
+            return toggleMark(markType)(state, dispatch)
+          }
+          // lụm từ mã nguồn toggleMark + gpt
+          const { nodeAfter } = $cursor
+          // Get after node of doc, if is "", return toggleMark for default command, example "Mot h|ai ba" => "ai ba"
+          if (nodeAfter) {
+            // If cursor is in the middle of a word, apply bold to the remaining part of the word
+            const { start, end } = findTextPosition(state.doc, $cursor.pos)
+            // Truyen vào hàm doc của state hiện tại và vị trí pos của anchor
+            // trỏ chuột để tìm start, end của word cần bôi đen
+            const hasStrongMark = state.doc.rangeHasMark(start, end, markType)
+            // check has mark strong in this word, return true or false
+            if (dispatch) {
+              let tr = state.tr // transaction
+              //thêm mark đánh dấu vào nội dung inline với vị trí của từ dc chọn và set to strong text
+              if (hasStrongMark) {
+                // If the word already has the strong mark, remove it
+                tr.removeMark(start, end, markType)
+              } else {
+                // If the word does not have the strong mark, add it
+                tr.addMark(start, end, markType.create())
+              }
+              dispatch(tr)
+            }
+            return true
+          } else {
+            // If cursor is at the end of the document or in an empty node, apply bold as usual
+            return toggleMark(markType)(state, dispatch)
+          }
+        }
+      }),
+      keymap(baseKeymap),
+      keymap(buildKeymap(schema)),
+      menuBar({
+        content: buildMenuItems(schema).fullMenu
+      }),
+      handlePaste
+    ]
+  })
+
+  view = new EditorView(editor.value, {
+    state
+  })
+}
+onMounted(() => {
+  createEditor()
+}),
+  onBeforeUnmount(() => {
+    if (view) view.destroy()
+  })
+</script>
+
+<style lang="scss" scoped></style>
