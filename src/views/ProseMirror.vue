@@ -9,7 +9,7 @@
 import { onMounted, ref, onBeforeUnmount } from 'vue'
 import { EditorState, Plugin } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
-import { DOMParser } from 'prosemirror-model'
+import { DOMParser, Slice } from 'prosemirror-model'
 import { schema } from 'prosemirror-schema-basic'
 import { buildKeymap } from 'prosemirror-example-setup'
 import { baseKeymap, toggleMark } from 'prosemirror-commands'
@@ -43,38 +43,30 @@ const createEditor = () => {
     return { start, end }
   }
 
-  const handleLinkTransformation = (view, from, to, text) => {
-    const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/g
-    const tr = view.state.tr
-    let pos = from
+  function linkPasteHandler() {
+    return new Plugin({
+      props: {
+        handlePaste(view, event) { // xu ly su kien paste
+          const text = event.clipboardData.getData('text/plain') // lay text tu clip board
+          const urlRegex = /https?:\/\/[^\s]+/g
+          if (urlRegex.test(text)) {
+            // if text is url
+            const linkMark = view.state.schema.marks.link.create({ href: text })
+            // mark text as link
+            const node = view.state.schema.text(text, [linkMark]) // create text node with text url and link Mark
+            const fragment = Slice.fromJSON(view.state.schema, { content: [node.toJSON()] }) // create fragment to replace with text url
 
-    text.split(urlPattern).forEach((part) => {
-      if (urlPattern.test(part)) {
-        const url = part.startsWith('http') ? part : `http://${part}`
-        tr.replaceWith(
-          pos,
-          pos + part.length,
-          schema.text(part, [schema.marks.link.create({ href: url })])
-        )
-        pos += part.length
-      } else {
-        tr.replaceWith(pos, pos + part.length, schema.text(part))
-        pos += part.length
+            const tr = view.state.tr.replaceSelection(fragment) // transaction to replace text url
+            view.dispatch(tr)
+            return true
+          }
+
+          return false
+        }
       }
     })
-
-    view.dispatch(tr)
-    return true
   }
-  const handlePaste = new Plugin({
-    props: {
-      handlePaste(view, event) {
-        const text = event.clipboardData.getData('text/plain')
-        const { from, to } = view.state.selection
-        return handleLinkTransformation(view, from, to, text)
-      }
-    }
-  })
+
   const state = EditorState.create({
     doc,
     plugins: [
@@ -123,7 +115,7 @@ const createEditor = () => {
       menuBar({
         content: buildMenuItems(schema).fullMenu
       }),
-      handlePaste
+      linkPasteHandler()
     ]
   })
 
@@ -139,4 +131,10 @@ onMounted(() => {
   })
 </script>
 
-<style lang="scss" scoped></style>
+<style>
+a {
+  color: #0075ff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+</style>

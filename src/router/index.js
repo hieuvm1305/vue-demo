@@ -21,6 +21,11 @@ const router = createRouter({
       path: '/editor',
       name: 'editor',
       component: () => import('../views/ProseMirror.vue')
+    },
+    {
+      path: '/link',
+      name: 'link',
+      component: () => import('../views/LinkEditor.vue')
     }
   ]
 })
