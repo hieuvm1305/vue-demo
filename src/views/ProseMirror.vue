@@ -9,7 +9,7 @@
 import { onMounted, ref, onBeforeUnmount } from 'vue'
 import { EditorState, Plugin } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
-import { DOMParser, Slice } from 'prosemirror-model'
+import { DOMParser} from 'prosemirror-model'
 import { schema } from 'prosemirror-schema-basic'
 import { buildKeymap } from 'prosemirror-example-setup'
 import { baseKeymap, toggleMark } from 'prosemirror-commands'
@@ -43,29 +43,49 @@ const createEditor = () => {
     return { start, end }
   }
 
-  function linkPasteHandler() {
-    return new Plugin({
-      props: {
-        handlePaste(view, event) { // xu ly su kien paste
-          const text = event.clipboardData.getData('text/plain') // lay text tu clip board
-          const urlRegex = /https?:\/\/[^\s]+/g
-          if (urlRegex.test(text)) {
-            // if text is url
-            const linkMark = view.state.schema.marks.link.create({ href: text })
-            // mark text as link
-            const node = view.state.schema.text(text, [linkMark]) // create text node with text url and link Mark
-            const fragment = Slice.fromJSON(view.state.schema, { content: [node.toJSON()] }) // create fragment to replace with text url
+  // function linkPasteHandler() {
+  //   return new Plugin({
+  //     props: {
+  //       handlePaste(view, event) { // xu ly su kien paste
+  //         const text = event.clipboardData.getData('text/plain') // lay text tu clip board
+  //         const urlRegex = /https?:\/\/[^\s]+/g
+  //         if (urlRegex.test(text)) {
+  //           // if text is url
+  //           const linkMark = view.state.schema.marks.link.create({ href: text })
+  //           // mark text as link
+  //           const node = view.state.schema.text(text, [linkMark]) // create text node with text url and link Mark
+  //           const fragment = Slice.fromJSON(view.state.schema, { content: [node.toJSON()] }) // create fragment to replace with text url
 
-            const tr = view.state.tr.replaceSelection(fragment) // transaction to replace text url
-            view.dispatch(tr)
-            return true
-          }
+  //           const tr = view.state.tr.replaceSelection(fragment) // transaction to replace text url
+  //           view.dispatch(tr)
+  //           return true
+  //         }
 
-          return false
+  //         return false
+  //       }
+  //     }
+  //   })
+  // }
+  const customPlugin = new Plugin({
+    props: {
+      handleDOMEvents: {
+        mouseup(view, event) {
+          setTimeout(() => {
+            const selection = view.state.selection;
+            const { from, to } = selection;
+            const markStrong = state.schema.marks.strong
+            const selectedText = view.state.doc.textBetween(from, to);
+            if (selectedText) {
+              const tr = view.state.tr.addMark(from, to, markStrong.create());
+              view.dispatch(tr);
+              return true
+            }
+          }, 3000)
         }
+        
       }
-    })
-  }
+    }
+  })
 
   const state = EditorState.create({
     doc,
@@ -115,7 +135,7 @@ const createEditor = () => {
       menuBar({
         content: buildMenuItems(schema).fullMenu
       }),
-      linkPasteHandler()
+      customPlugin
     ]
   })
 
@@ -125,6 +145,7 @@ const createEditor = () => {
 }
 onMounted(() => {
   createEditor()
+  setTimeout(() => {}, 5000)
 }),
   onBeforeUnmount(() => {
     if (view) view.destroy()
