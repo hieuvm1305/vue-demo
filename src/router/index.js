@@ -23,6 +23,11 @@ const router = createRouter({
       component: () => import('../views/ProseMirror.vue')
     },
     {
+      path: '/prose',
+      name: 'prose',
+      component: () => import('../views/NewProse.vue')
+    },
+    {
       path: '/link',
       name: 'link',
       component: () => import('../views/LinkEditor.vue')

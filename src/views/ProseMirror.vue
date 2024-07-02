@@ -9,7 +9,7 @@
 import { onMounted, ref, onBeforeUnmount } from 'vue'
 import { EditorState, Plugin } from 'prosemirror-state'
 import { EditorView } from 'prosemirror-view'
-import { DOMParser} from 'prosemirror-model'
+import { DOMParser } from 'prosemirror-model'
 import { schema } from 'prosemirror-schema-basic'
 import { buildKeymap } from 'prosemirror-example-setup'
 import { baseKeymap, toggleMark } from 'prosemirror-commands'
@@ -69,20 +69,27 @@ const createEditor = () => {
   const customPlugin = new Plugin({
     props: {
       handleDOMEvents: {
-        mouseup(view, event) {
-          setTimeout(() => {
-            const selection = view.state.selection;
-            const { from, to } = selection;
-            const markStrong = state.schema.marks.strong
-            const selectedText = view.state.doc.textBetween(from, to);
-            if (selectedText) {
-              const tr = view.state.tr.addMark(from, to, markStrong.create());
-              view.dispatch(tr);
-              return true
-            }
-          }, 3000)
-        }
-        
+        // mouseup(view, event) {
+        //   const selection = view.state.selection;
+        //   const { from, to } = selection;
+        //   const markStrong = state.schema.marks.strong
+        //   const selectedText = view.state.doc.textBetween(from, to);
+        //   if (selectedText) {
+
+        //     const hasStrongMark = state.doc.rangeHasMark(from, to, markStrong)
+        //     let tr
+        //     if (hasStrongMark) {
+        //       // If the word already has the strong mark, remove it
+        //       tr = view.state.tr.removeMark(from, to, markStrong)
+        //     } else {
+        //       // If the word does not have the strong mark, add it
+        //       tr = view.state.tr.addMark(from, to, markStrong.create())
+        //     }
+        //     view.dispatch(tr);
+        //     return true
+        //   }
+        // }
+
       }
     }
   })
@@ -143,9 +150,34 @@ const createEditor = () => {
     state
   })
 }
+function handleBold(view) {
+  const selection = view.state.selection;
+  const state = view.state
+  const { from, to } = selection;
+  const markStrong = state.schema.marks.strong
+
+  const selectedText = view.state.doc.textBetween(from, to);
+  if (selectedText) {
+
+    const hasStrongMark = state.doc.rangeHasMark(from, to, markStrong)
+    let tr
+    if (hasStrongMark) {
+      // If the word already has the strong mark, remove it
+      tr = view.state.tr.removeMark(from, to, markStrong)
+    } else {
+      // If the word does not have the strong mark, add it
+      tr = view.state.tr.addMark(from, to, markStrong.create())
+    }
+    view.dispatch(tr);
+    return true
+  }
+}
+
 onMounted(() => {
   createEditor()
-  setTimeout(() => {}, 5000)
+  setTimeout(() => {
+    handleBold(view)
+  }, 5000)
 }),
   onBeforeUnmount(() => {
     if (view) view.destroy()
